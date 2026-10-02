@@ -1,0 +1,402 @@
+{
+  "info": {
+    "_postman_id": "3f90135c-d0ec-4a33-8998-82755bb0110a",
+    "name": "CLF Backend API",
+    "description": "Requests for the root welcome endpoint and every registered /api endpoint. The API is stateless: Admin login returns admin details, not a bearer token. Create requests save returned IDs into collection variables for follow-up requests. Gallery create/update use multipart form-data; select local files for catalogThumbnail and photos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Welcome",
+      "item": [
+        {
+          "name": "API welcome",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{serverUrl}}/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": "{{baseUrl}}/admin/login",
+            "description": "Authenticate an admin. Seeded development credentials are admin / admin123. This endpoint does not issue a bearer token."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/admin/logout",
+            "description": "Stateless logout; no authentication header is required."
+          }
+        }
+      ]
+    },
+    {
+      "name": "About",
+      "item": [
+        {
+          "name": "List about content",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/about?category=style",
+            "description": "Lists active parent entries with children. Optional category: style or biographies."
+          }
+        },
+        {
+          "name": "Get about content",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/about/{{aboutId}}"
+          }
+        },
+        {
+          "name": "Create about content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Choy Lee Fut\",\n  \"title\": \"History\",\n  \"category\": \"style\",\n  \"description\": \"About this style.\",\n  \"parent_id\": null,\n  \"order\": 0\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": "{{baseUrl}}/about",
+            "description": "Required fields: name, title, category (style or biographies), description. Optional: parent_id, order.",
+            "event": [{
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('aboutId', pm.response.json().data._id);",
+                  "}"
+                ]
+              }
+            }]
+          }
+        },
+        {
+          "name": "Update about content",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated history\",\n  \"description\": \"Updated description.\",\n  \"order\": 1\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": "{{baseUrl}}/about/{{aboutId}}",
+            "description": "All fields are optional. Accepts name, title, category, description, parent_id, order, and isActive."
+          }
+        },
+        {
+          "name": "Delete about content",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/about/{{aboutId}}",
+            "description": "Parents cannot be deleted while child entries exist."
+          }
+        }
+      ]
+    },
+    {
+      "name": "News",
+      "item": [
+        {
+          "name": "List news",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/news?page=1&limit=10",
+            "description": "Paginated, newest first. Query parameters page and limit are optional."
+          }
+        },
+        {
+          "name": "Get news",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/news/{{newsId}}"
+          }
+        },
+        {
+          "name": "Create news",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Community event\",\n  \"description\": \"Event details.\",\n  \"date\": \"2026-10-02\",\n  \"slug\": \"community-event\",\n  \"isActive\": true\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": "{{baseUrl}}/news",
+            "description": "Required fields: title, description, date, slug. Slugs must be unique.",
+            "event": [{
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('newsId', pm.response.json().data._id);",
+                  "}"
+                ]
+              }
+            }]
+          }
+        },
+        {
+          "name": "Update news",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated community event\",\n  \"description\": \"Updated details.\",\n  \"date\": \"2026-10-03\",\n  \"isActive\": true\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": "{{baseUrl}}/news/{{newsId}}",
+            "description": "All fields are optional: title, description, date, slug, isActive."
+          }
+        },
+        {
+          "name": "Delete news",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/news/{{newsId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gallery",
+      "item": [
+        {
+          "name": "List galleries by year",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/gallery/list-by-year"
+          }
+        },
+        {
+          "name": "Get gallery",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/gallery/{{galleryId}}"
+          }
+        },
+        {
+          "name": "Create gallery",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "title", "value": "2026 Lion Dance", "type": "text"},
+                {"key": "year", "value": "2026", "type": "text"},
+                {"key": "subTitle", "value": "Community event", "type": "text"},
+                {"key": "catalogThumbnail", "type": "file", "src": []},
+                {"key": "photos", "type": "file", "src": []}
+              ]
+            },
+            "url": "{{baseUrl}}/gallery",
+            "description": "Use multipart form-data. Title is required. Select a local file for catalogThumbnail and optionally one or more files using repeated photos fields. Let Postman set the multipart Content-Type boundary.",
+            "event": [{
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('galleryId', pm.response.json().data._id);",
+                  "}"
+                ]
+              }
+            }]
+          }
+        },
+        {
+          "name": "Update gallery",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "title", "value": "Updated gallery title", "type": "text"},
+                {"key": "year", "value": "2026", "type": "text"},
+                {"key": "subTitle", "value": "Updated event details", "type": "text"},
+                {"key": "catalogThumbnail", "type": "file", "src": []},
+                {"key": "photos", "type": "file", "src": []}
+              ]
+            },
+            "url": "{{baseUrl}}/gallery/{{galleryId}}",
+            "description": "All text fields are optional. Select catalogThumbnail only if replacing it. Uploading photos replaces the gallery's existing photos. Let Postman set the multipart Content-Type boundary."
+          }
+        },
+        {
+          "name": "Delete gallery",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/gallery/{{galleryId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Videos",
+      "item": [
+        {
+          "name": "List videos",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/videos"
+          }
+        },
+        {
+          "name": "Get video",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/videos/{{videoId}}"
+          }
+        },
+        {
+          "name": "Create video",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Lion Dance\",\n  \"videoUrl\": \"https://youtu.be/example\",\n  \"catalogThumbnail\": \"/uploads/lion-dance.png\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": "{{baseUrl}}/videos",
+            "description": "Required fields: title, videoUrl, catalogThumbnail.",
+            "event": [{
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('videoId', pm.response.json().data._id);",
+                  "}"
+                ]
+              }
+            }]
+          }
+        },
+        {
+          "name": "Update video",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Lion Dance\",\n  \"videoUrl\": \"https://youtu.be/example-updated\",\n  \"catalogThumbnail\": \"/uploads/lion-dance-updated.png\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": "{{baseUrl}}/videos/{{videoId}}"
+          }
+        },
+        {
+          "name": "Delete video",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/videos/{{videoId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contact",
+      "item": [
+        {
+          "name": "Submit contact message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alex Wong\",\n  \"email\": \"alex@example.com\",\n  \"subject\": \"Class schedule\",\n  \"message\": \"Please send me the current class schedule.\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": "{{baseUrl}}/contact",
+            "description": "All fields are required: name, email, subject, message."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get dashboard stats",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Accept", "value": "application/json"}],
+            "url": "{{baseUrl}}/dashboard"
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {"type": "noauth"},
+  "variable": [
+    {"key": "serverUrl", "value": "http://127.0.0.1:8000", "type": "string"},
+    {"key": "baseUrl", "value": "{{serverUrl}}/api", "type": "string"},
+    {"key": "adminUsername", "value": "admin", "type": "string"},
+    {"key": "adminPassword", "value": "admin123", "type": "string"},
+    {"key": "aboutId", "value": "0123456789abcdef01234567", "type": "string"},
+    {"key": "newsId", "value": "0123456789abcdef01234567", "type": "string"},
+    {"key": "galleryId", "value": "0123456789abcdef01234567", "type": "string"},
+    {"key": "videoId", "value": "0123456789abcdef01234567", "type": "string"}
+  ]
+}
