@@ -73,6 +73,14 @@ abstract class ApiTestCase extends TestCase
         return $this->call($method, $uri);
     }
 
+    /**
+     * Path on disk of an uploaded file's "/uploads/..." URL.
+     */
+    protected function uploadedFile(string $url): string
+    {
+        return $this->uploads.substr($url, strlen('/uploads'));
+    }
+
     protected function assertIsoDate($value)
     {
         $this->assertRegExp('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/', $value);

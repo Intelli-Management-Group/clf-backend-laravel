@@ -23,15 +23,39 @@ class GalleryTest extends ApiTestCase
         ]);
 
         $data = $response->json('data');
-        $this->assertRegExp('#^/uploads/\d{13}-my_thumb\.png$#', $data['catalogThumbnail']);
+        $folder = '/uploads/galleries/'.$data['_id'];
+        $this->assertRegExp('#^'.$folder.'/thumbnail/\d{13}-my_thumb\.png$#', $data['catalogThumbnail']);
         $this->assertCount(2, $data['photos']);
-        $this->assertRegExp('#^/uploads/\d{13}-p1\.png$#', $data['photos'][0]['src']);
-        $this->assertRegExp('#^/uploads/\d{13}-p_2\.png$#', $data['photos'][1]['src']);
+        $this->assertRegExp('#^'.$folder.'/\d{13}-p1\.png$#', $data['photos'][0]['src']);
+        $this->assertRegExp('#^'.$folder.'/\d{13}-p_2\.png$#', $data['photos'][1]['src']);
         $this->assertObjectId($data['photos'][0]['_id']);
 
-        $this->assertSame('thumb', file_get_contents($this->uploads.'/'.basename($data['catalogThumbnail'])));
-        $this->assertSame('two', file_get_contents($this->uploads.'/'.basename($data['photos'][1]['src'])));
-        $this->assertCount(3, glob($this->uploads.'/*'));
+        // Files GD cannot decode are stored untouched.
+        $this->assertSame('thumb', file_get_contents($this->uploadedFile($data['catalogThumbnail'])));
+        $this->assertSame('two', file_get_contents($this->uploadedFile($data['photos'][1]['src'])));
+        $this->assertCount(2, glob($this->uploads.'/galleries/'.$data['_id'].'/*.png'));
+        $this->assertCount(1, glob($this->uploads.'/galleries/'.$data['_id'].'/thumbnail/*'));
+    }
+
+    public function test_uploaded_images_are_scaled_down_and_compressed()
+    {
+        config(['clf.uploads.max_dimension' => 800]);
+
+        $image = imagecreatetruecolor(1600, 1200);
+        for ($i = 0; $i < 4000; $i++) {
+            imagefilledellipse($image, mt_rand(0, 1600), mt_rand(0, 1200), mt_rand(5, 60), mt_rand(5, 60), mt_rand(0, 0xFFFFFF));
+        }
+        ob_start();
+        imagejpeg($image, null, 100);
+        $jpeg = ob_get_clean();
+
+        $src = $this->multipart('POST', '/api/gallery', [['title', 'G']], [['photos', 'big.jpg', $jpeg]])
+            ->assertStatus(201)
+            ->json('data.photos.0.src');
+
+        $file = $this->uploadedFile($src);
+        $this->assertLessThan(strlen($jpeg), filesize($file));
+        $this->assertSame([800, 600], array_slice(getimagesize($file), 0, 2));
     }
 
     public function test_more_photos_than_phps_max_file_uploads()
@@ -67,7 +91,7 @@ class GalleryTest extends ApiTestCase
 
         $response->assertStatus(200)->assertJson(['message' => 'Gallery updated successfully', 'data' => ['title' => 'G', 'subTitle' => 'New']]);
         $this->assertCount(1, $response->json('data.photos'));
-        $this->assertRegExp('#-c\.png$#', $response->json('data.photos.0.src'));
+        $this->assertRegExp('#^/uploads/galleries/'.$id.'/\d{13}-c\.png$#', $response->json('data.photos.0.src'));
 
         $this->putJson('/api/gallery/0123456789abcdef01234567', ['title' => 'x'])
             ->assertStatus(404)

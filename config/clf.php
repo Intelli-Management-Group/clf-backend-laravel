@@ -7,14 +7,20 @@ return [
     | Uploads
     |--------------------------------------------------------------------------
     |
-    | Gallery images are stored in public/uploads and referenced by the
-    | relative URL "/uploads/<file>", exactly like the Node.js backend.
+    | Gallery images are stored in public/uploads/galleries/<gallery id>
+    | (catalog thumbnails in its "thumbnail" sub folder) and referenced by
+    | the relative URL "/uploads/...". Uploaded JPEG, PNG and WebP images
+    | are compressed: scaled down to at most `max_dimension` pixels on the
+    | longest side and re-encoded, keeping the original if that is smaller.
     |
     */
 
     'uploads' => [
         'directory' => public_path('uploads'),
         'url' => '/uploads',
+        'compress' => (bool) env('UPLOADS_COMPRESS', true),
+        'max_dimension' => (int) env('UPLOADS_MAX_DIMENSION', 2000),
+        'jpeg_quality' => (int) env('UPLOADS_JPEG_QUALITY', 80),
     ],
 
     /*

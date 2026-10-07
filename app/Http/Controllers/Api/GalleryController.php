@@ -8,8 +8,10 @@ use App\Http\Resources\GallerySummaryResource;
 use App\Models\Gallery;
 use App\Services\UploadService;
 use App\Support\Js;
+use App\Support\ObjectId;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 /**
  * Photo galleries. Create/update accept multipart/form-data with a
@@ -93,15 +95,18 @@ class GalleryController extends Controller
             $body = $this->body($request, 'title');
             list($thumbnail, $photos) = $this->uploadedImages($request);
 
-            $catalogThumbnail = $thumbnail ? $this->uploads->store($thumbnail) : '';
-            $sources = array_map([$this->uploads, 'store'], $photos);
+            // The id is chosen up front so the images go straight into the gallery's folder.
+            $id = ObjectId::generate();
+            $catalogThumbnail = $thumbnail ? $this->storeThumbnail($thumbnail, $id) : '';
+            $sources = $this->storePhotos($photos, $id);
 
             $attributes = Gallery::schema()->forCreate(
                 $this->present($body, ['title', 'year', 'subTitle']) + ['catalogThumbnail' => $catalogThumbnail]
             );
 
-            $gallery = DB::transaction(function () use ($attributes, $sources) {
+            $gallery = DB::transaction(function () use ($id, $attributes, $sources) {
                 $gallery = (new Gallery)->fillFromApi($attributes);
+                $gallery->setAttribute($gallery->getKeyName(), $id);
                 $gallery->save();
                 $gallery->replacePhotos($sources);
 
@@ -134,10 +139,6 @@ class GalleryController extends Controller
             list($thumbnail, $photos) = $this->uploadedImages($request);
 
             $updates = $this->present($body, ['title', 'year', 'subTitle']);
-            if ($thumbnail) {
-                $updates['catalogThumbnail'] = $this->uploads->store($thumbnail);
-            }
-            $sources = array_map([$this->uploads, 'store'], $photos);
 
             $key = Gallery::castId($id);
             $changes = Gallery::schema()->forUpdate($updates, false);
@@ -146,6 +147,11 @@ class GalleryController extends Controller
             if (! $gallery) {
                 return $this->notFound();
             }
+
+            if ($thumbnail) {
+                $changes += Gallery::schema()->forUpdate(['catalogThumbnail' => $this->storeThumbnail($thumbnail, $key)], false);
+            }
+            $sources = $this->storePhotos($photos, $key);
 
             DB::transaction(function () use ($gallery, $changes, $sources) {
                 $gallery->fillFromApi($changes)->touch();
@@ -197,6 +203,26 @@ class GalleryController extends Controller
                 'data' => null,
             ], 500);
         }
+    }
+
+    /**
+     * Folder of a gallery's images, relative to the uploads directory.
+     */
+    public static function folder(string $galleryId): string
+    {
+        return 'galleries/'.$galleryId;
+    }
+
+    private function storeThumbnail(UploadedFile $file, string $galleryId): string
+    {
+        return $this->uploads->store($file, self::folder($galleryId).'/thumbnail');
+    }
+
+    private function storePhotos(array $files, string $galleryId): array
+    {
+        return array_map(function (UploadedFile $file) use ($galleryId) {
+            return $this->uploads->store($file, self::folder($galleryId));
+        }, $files);
     }
 
     /**

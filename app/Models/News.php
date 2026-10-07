@@ -20,9 +20,8 @@ class News extends Model
 
     protected $fillable = ['title', 'description', 'date', 'slug', 'is_active'];
 
-    protected $dates = ['date'];
-
     protected $casts = [
+        'date' => 'datetime',
         'is_active' => 'boolean',
     ];
 

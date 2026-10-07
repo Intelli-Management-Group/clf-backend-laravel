@@ -17,7 +17,10 @@ class AboutController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = About::query()->with('parent')->where('is_active', true);
+            $query = About::query()
+                ->with('parent')
+                ->where('is_active', true)
+                ->whereIn('category', About::CATEGORIES);
 
             $category = $request->query('category');
             if (is_string($category) && $category !== '') {

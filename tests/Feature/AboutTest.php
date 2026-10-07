@@ -90,6 +90,7 @@ class AboutTest extends ApiTestCase
         );
 
         $this->assertSame(['Parent'], array_column($this->getJson('/api/about?category=style')->json('data'), 'name'));
+        $this->assertSame([], $this->getJson('/api/about?category=other')->json('data'));
 
         // Children of an inactive parent disappear with it.
         $this->putJson("/api/about/{$parent}", ['isActive' => 'no'])->assertStatus(200);

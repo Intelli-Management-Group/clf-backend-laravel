@@ -5,29 +5,10 @@
 
     RewriteEngine On
 
-    # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Trailing slashes are NOT redirected: like Express, "/api/news/" and
-    # "/api/news" reach the same route (a redirect would also break POST/PUT).
-
-    # Handle Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
-
-# Let the application read raw request bodies (multipart uploads are parsed
-# by the app to support repeated "photos" fields and PUT uploads).
-<IfModule mod_php7.c>
-    php_flag enable_post_data_reading Off
-</IfModule>
-<IfModule mod_php.c>
-    php_flag enable_post_data_reading Off
-</IfModule>
-
-# Never serve PHP configuration files.
-<Files ".user.ini">
-    Require all denied
-</Files>
