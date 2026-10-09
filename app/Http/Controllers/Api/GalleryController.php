@@ -129,8 +129,8 @@ class GalleryController extends Controller
     }
 
     /**
-     * PUT /api/gallery/{id} (multipart). Uploaded photos replace the
-     * existing ones; a new catalogThumbnail replaces the old one.
+     * PUT /api/gallery/{id} (multipart). Uploaded photos replace existing
+     * ones; otherwise submitted photoUrls keep only those existing images.
      */
     public function update(Request $request, string $id)
     {
@@ -152,11 +152,32 @@ class GalleryController extends Controller
                 $changes += Gallery::schema()->forUpdate(['catalogThumbnail' => $this->storeThumbnail($thumbnail, $key)], false);
             }
             $sources = $this->storePhotos($photos, $key);
+            $photoUrls = null;
 
-            DB::transaction(function () use ($gallery, $changes, $sources) {
+            if (! $sources && array_key_exists('photoUrls', $body)) {
+                $photoUrls = $body['photoUrls'];
+                if (is_string($photoUrls)) {
+                    $photoUrls = [$photoUrls];
+                }
+                if (! is_array($photoUrls)) {
+                    throw new \InvalidArgumentException('photoUrls must be a string or an array of strings');
+                }
+                foreach ($photoUrls as $photoUrl) {
+                    if (! is_string($photoUrl)) {
+                        throw new \InvalidArgumentException('photoUrls must contain only strings');
+                    }
+                }
+                $photoUrls = array_values(array_filter(array_map('trim', $photoUrls), function ($photoUrl) {
+                    return $photoUrl !== '';
+                }));
+            }
+
+            DB::transaction(function () use ($gallery, $changes, $sources, $photoUrls) {
                 $gallery->fillFromApi($changes)->touch();
                 if ($sources) {
                     $gallery->replacePhotos($sources);
+                } elseif ($photoUrls !== null) {
+                    $gallery->syncPhotoUrls($photoUrls);
                 }
             });
 

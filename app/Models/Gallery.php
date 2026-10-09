@@ -55,4 +55,34 @@ class Gallery extends Model
 
         $this->unsetRelation('photos');
     }
+
+    /**
+     * Keep the supplied image URLs, removing omitted photo records without
+     * deleting their files, and preserve IDs for URLs that remain.
+     */
+    public function syncPhotoUrls(array $sources)
+    {
+        if ($sources) {
+            $this->photos()->whereNotIn('src', $sources)->delete();
+        } else {
+            $this->photos()->delete();
+        }
+
+        $existingBySource = $this->photos()->get()->keyBy('src');
+
+        foreach (array_values($sources) as $position => $src) {
+            $photo = $existingBySource->get($src);
+
+            if ($photo) {
+                if ($photo->position !== $position) {
+                    $photo->position = $position;
+                    $photo->save();
+                }
+            } else {
+                $this->photos()->create(['src' => $src, 'position' => $position]);
+            }
+        }
+
+        $this->unsetRelation('photos');
+    }
 }
