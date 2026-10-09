@@ -98,6 +98,36 @@ class GalleryTest extends ApiTestCase
             ->assertExactJson(['success' => false, 'message' => 'Gallery not found', 'data' => null]);
     }
 
+    public function test_multipart_put_photo_urls_removes_omitted_photos_but_keeps_files()
+    {
+        $created = $this->multipart('POST', '/api/gallery', [['title', 'G']], [
+            ['photos', 'keep-one.png', 'one'],
+            ['photos', 'remove.png', 'remove'],
+            ['photos', 'keep-two.png', 'two'],
+        ])->assertStatus(201)->json('data');
+        $galleryId = $created['_id'];
+        $keptPhotos = [$created['photos'][0], $created['photos'][2]];
+        $removedFile = $this->uploadedFile($created['photos'][1]['src']);
+
+        $updated = $this->multipart('PUT', "/api/gallery/{$galleryId}", [
+            ['title', 'G'],
+            ['photoUrls', $keptPhotos[0]['src']],
+            ['photoUrls', $keptPhotos[1]['src']],
+        ])->assertStatus(200);
+
+        $this->assertSame(
+            [$keptPhotos[0]['_id'], $keptPhotos[1]['_id']],
+            array_column($updated->json('data.photos'), '_id')
+        );
+        $this->assertFileExists($removedFile);
+        $this->assertSame('remove', file_get_contents($removedFile));
+
+        $this->multipart('PUT', "/api/gallery/{$galleryId}", [
+            ['title', 'G'],
+            ['photoUrls', $keptPhotos[0]['src']],
+        ])->assertStatus(200)->assertJsonCount(1, 'data.photos');
+    }
+
     public function test_list_by_year_orders_groups_like_a_javascript_object()
     {
         foreach (['abc', '2025', '', '0', '2023'] as $year) {
