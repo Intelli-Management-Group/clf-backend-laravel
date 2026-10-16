@@ -5,7 +5,7 @@ namespace App\Models\Concerns;
 use App\Support\ObjectId;
 
 /**
- * Give a model a MongoDB-style ObjectId primary key (CHAR(24)).
+ * Gives a model a MongoDB-style ObjectId primary key (CHAR(24)).
  */
 trait HasObjectId
 {
