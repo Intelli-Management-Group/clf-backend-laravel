@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
+use Illuminate\Support\Facades\Hash;
 
 class AdminTest extends ApiTestCase
 {
@@ -35,6 +36,34 @@ class AdminTest extends ApiTestCase
     {
         $this->postJson('/api/admin/login', ['username' => ' admin ', 'password' => 'admin123'])->assertStatus(200);
         $this->postJson('/api/admin/login', ['username' => 'Admin', 'password' => 'admin123'])->assertStatus(401);
+    }
+
+    public function test_wordpress_bcrypt_password_can_log_in_and_is_upgraded()
+    {
+        $admin = Admin::query()->firstOrFail();
+        $admin->password = '$wp'.Hash::make('$wp'.'admin123');
+        $admin->save();
+
+        $this->postJson('/api/admin/login', ['username' => 'admin', 'password' => 'admin123'])
+            ->assertStatus(200);
+
+        $admin->refresh();
+        $this->assertStringStartsWith('$2y$', $admin->password);
+        $this->assertTrue(Hash::check('admin123', $admin->password));
+    }
+
+    public function test_wordpress_portable_password_can_log_in_and_is_upgraded()
+    {
+        $admin = Admin::query()->firstOrFail();
+        $admin->password = $this->portableHash('admin123', '$P$B12345678');
+        $admin->save();
+
+        $this->postJson('/api/admin/login', ['username' => 'admin', 'password' => 'admin123'])
+            ->assertStatus(200);
+
+        $admin->refresh();
+        $this->assertStringStartsWith('$2y$', $admin->password);
+        $this->assertTrue(Hash::check('admin123', $admin->password));
     }
 
     public function test_invalid_credentials()
@@ -78,5 +107,40 @@ class AdminTest extends ApiTestCase
         $this->withoutBody('POST', '/api/admin/logout')
             ->assertStatus(200)
             ->assertExactJson(['success' => true, 'message' => 'Logout successful']);
+    }
+
+    private function portableHash(string $password, string $setting): string
+    {
+        $alphabet = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+        $count = 1 << strpos($alphabet, $setting[3]);
+        $hash = md5(substr($setting, 4, 8).$password, true);
+
+        for (; $count > 0; $count--) {
+            $hash = md5($hash.$password, true);
+        }
+
+        $output = substr($setting, 0, 12);
+        $index = 0;
+        do {
+            $value = ord($hash[$index++]);
+            $output .= $alphabet[$value & 0x3F];
+            if ($index < 16) {
+                $value |= ord($hash[$index]) << 8;
+            }
+            $output .= $alphabet[($value >> 6) & 0x3F];
+            if ($index++ >= 16) {
+                break;
+            }
+            if ($index < 16) {
+                $value |= ord($hash[$index]) << 16;
+            }
+            $output .= $alphabet[($value >> 12) & 0x3F];
+            if ($index++ >= 16) {
+                break;
+            }
+            $output .= $alphabet[($value >> 18) & 0x3F];
+        } while ($index < 16);
+
+        return $output;
     }
 }
