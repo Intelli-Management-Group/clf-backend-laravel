@@ -5,16 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AdminResource;
 use App\Models\Admin;
+use App\Services\WordPressPassword;
 use App\Support\Js;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
 {
     /**
      * POST /api/admin/login
      */
-    public function login(Request $request)
+    public function login(Request $request, WordPressPassword $passwords)
     {
         try {
             $body = $this->body($request, 'username');
@@ -47,7 +47,7 @@ class AdminController extends Controller
                 ], 401);
             }
 
-            if (! is_string($password) || ! Hash::check($password, $admin->password)) {
+            if (! is_string($password) || ! $passwords->checkAndUpgrade($admin, $password)) {
                 return $this->respond([
                     'success' => false,
                     'message' => 'Invalid credentials',
