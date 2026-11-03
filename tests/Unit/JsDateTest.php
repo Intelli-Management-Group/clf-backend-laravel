@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Support\JsDate;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -13,15 +14,13 @@ class JsDateTest extends TestCase
 {
     const LOCAL = 'Asia/Kolkata';
 
-    /**
-     * @dataProvider validDates
-     */
+    #[DataProvider('validDates')]
     public function test_parses_like_v8($value, string $expected)
     {
         $this->assertSame($expected, JsDate::toIsoString(JsDate::from($value, self::LOCAL)));
     }
 
-    public function validDates(): array
+    public static function validDates(): array
     {
         return [
             ['2025-12-17', '2025-12-17T00:00:00.000Z'],
@@ -57,15 +56,13 @@ class JsDateTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider invalidDates
-     */
+    #[DataProvider('invalidDates')]
     public function test_invalid_dates($value)
     {
         $this->assertNull(JsDate::from($value, self::LOCAL));
     }
 
-    public function invalidDates(): array
+    public static function invalidDates(): array
     {
         return [['now'], ['tomorrow'], [''], ['garbage'], ['2025-13-01'], ['2025-01-01T25:00'],
             ['2025-01-01T24:00:01'], ['2025-01-01T10'], ['20250101']];

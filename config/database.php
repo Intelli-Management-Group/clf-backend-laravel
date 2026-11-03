@@ -59,7 +59,7 @@ return [
             'strict' => true,
             'engine' => 'InnoDB',
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                Pdo\Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) + [
                 // Before PHP 7.3, native prepared statements drop the fractional
                 // seconds of DATETIME(3) columns; emulated prepares keep the
