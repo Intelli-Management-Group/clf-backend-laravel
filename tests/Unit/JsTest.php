@@ -64,7 +64,7 @@ class JsTest extends TestCase
     {
         $id = ObjectId::generate();
 
-        $this->assertRegExp('/^[0-9a-f]{24}$/', $id);
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{24}$/', $id);
         $this->assertNotSame($id, ObjectId::generate());
         $this->assertSame(time(), hexdec(substr($id, 0, 8)), '', 2);
         $this->assertTrue(ObjectId::isValid('6ABE8416FF74716FDF7A0BB9'));
