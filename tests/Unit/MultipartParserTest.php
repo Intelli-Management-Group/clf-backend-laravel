@@ -19,7 +19,7 @@ class MultipartParserTest extends TestCase
         return (new MultipartParser($fieldLimit))->parse($stream, self::BOUNDARY);
     }
 
-    private function part(string $disposition, string $content, string $type = null): string
+    private function part(string $disposition, string $content, ?string $type = null): string
     {
         return '--'.self::BOUNDARY."\r\nContent-Disposition: form-data; {$disposition}\r\n"
             .($type ? "Content-Type: {$type}\r\n" : '')."\r\n{$content}\r\n";

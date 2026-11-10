@@ -28,8 +28,6 @@
 !/storage/logs/.gitignore
 
 # Environment files
-.env
-.env.*
 !.env.example
 !.env.testing.example
 
@@ -73,3 +71,4 @@ desktop.ini
 *.tmp
 *.swp
 *.swo
+config.bat
