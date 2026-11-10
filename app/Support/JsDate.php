@@ -34,7 +34,7 @@ final class JsDate
      *
      * @param  mixed  $value
      */
-    public static function from($value, string $localTimezone = null)
+    public static function from($value, ?string $localTimezone = null)
     {
         $localTimezone = $localTimezone ?: config('clf.server_timezone', 'UTC');
 

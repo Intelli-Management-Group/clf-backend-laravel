@@ -77,29 +77,25 @@ class ImageOptimizer
             return [$before, $after];
         }
 
-        try {
-            if ($type === IMAGETYPE_JPEG) {
-                $image = $this->orient($image, $path);
-            }
-            $image = $this->downscale($image);
-
-            $temp = $path.'.tmp';
-            if (! $this->save($image, $temp, $type)) {
-                @unlink($temp);
-
-                return [$before, $after];
-            }
-
-            $size = (int) filesize($temp);
-            $smaller = $size > 0 && $size <= $before * (1 - $this->minSaving);
-            if ($smaller && ($dryRun || $this->replace($temp, $path))) {
-                $after = $size;
-            }
-
-            @unlink($temp);
-        } finally {
-            imagedestroy($image);
+        if ($type === IMAGETYPE_JPEG) {
+            $image = $this->orient($image, $path);
         }
+        $image = $this->downscale($image);
+
+        $temp = $path.'.tmp';
+        if (! $this->save($image, $temp, $type)) {
+            @unlink($temp);
+
+            return [$before, $after];
+        }
+
+        $size = (int) filesize($temp);
+        $smaller = $size > 0 && $size <= $before * (1 - $this->minSaving);
+        if ($smaller && ($dryRun || $this->replace($temp, $path))) {
+            $after = $size;
+        }
+
+        @unlink($temp);
 
         return [$before, $after];
     }
@@ -148,7 +144,6 @@ class ImageOptimizer
         if ($angle) {
             $rotated = imagerotate($image, $angle, 0);
             if ($rotated) {
-                imagedestroy($image);
                 $image = $rotated;
             }
         }
@@ -169,13 +164,7 @@ class ImageOptimizer
         $ratio = $this->maxDimension / $longest;
         $scaled = imagescale($image, max(1, (int) round($width * $ratio)), max(1, (int) round($height * $ratio)), IMG_BICUBIC);
 
-        if (! $scaled) {
-            return $image;
-        }
-
-        imagedestroy($image);
-
-        return $scaled;
+        return $scaled ?: $image;
     }
 
     private function replace(string $temp, string $path): bool

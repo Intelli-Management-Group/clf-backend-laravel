@@ -331,7 +331,7 @@ final class MultipartParser
         if (isset($params['filename*']) && preg_match("/^([^']*)'[^']*'(.*)$/", $params['filename*'], $m)) {
             $name = rawurldecode($m[2]);
             if (strtolower($m[1]) !== 'utf-8') {
-                $name = utf8_encode($name);
+                $name = mb_convert_encoding($name, 'UTF-8', 'ISO-8859-1');
             }
         } elseif (isset($params['filename'])) {
             $name = $params['filename'];
@@ -340,7 +340,7 @@ final class MultipartParser
         }
 
         if (! mb_check_encoding($name, 'UTF-8')) {
-            $name = utf8_encode($name);
+            $name = mb_convert_encoding($name, 'UTF-8', 'ISO-8859-1');
         }
 
         // busboy keeps only the last path segment of the client file name.

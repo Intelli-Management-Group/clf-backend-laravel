@@ -83,11 +83,11 @@ abstract class ApiTestCase extends TestCase
 
     protected function assertIsoDate($value)
     {
-        $this->assertRegExp('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/', $value);
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/', $value);
     }
 
     protected function assertObjectId($value)
     {
-        $this->assertRegExp('/^[0-9a-f]{24}$/', $value);
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{24}$/', $value);
     }
 }

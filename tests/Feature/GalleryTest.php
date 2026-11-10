@@ -24,10 +24,10 @@ class GalleryTest extends ApiTestCase
 
         $data = $response->json('data');
         $folder = '/uploads/galleries/'.$data['_id'];
-        $this->assertRegExp('#^'.$folder.'/thumbnail/\d{13}-my_thumb\.png$#', $data['catalogThumbnail']);
+        $this->assertMatchesRegularExpression('#^'.$folder.'/thumbnail/\d{13}-my_thumb\.png$#', $data['catalogThumbnail']);
         $this->assertCount(2, $data['photos']);
-        $this->assertRegExp('#^'.$folder.'/\d{13}-p1\.png$#', $data['photos'][0]['src']);
-        $this->assertRegExp('#^'.$folder.'/\d{13}-p_2\.png$#', $data['photos'][1]['src']);
+        $this->assertMatchesRegularExpression('#^'.$folder.'/\d{13}-p1\.png$#', $data['photos'][0]['src']);
+        $this->assertMatchesRegularExpression('#^'.$folder.'/\d{13}-p_2\.png$#', $data['photos'][1]['src']);
         $this->assertObjectId($data['photos'][0]['_id']);
 
         // Files GD cannot decode are stored untouched.
@@ -91,7 +91,7 @@ class GalleryTest extends ApiTestCase
 
         $response->assertStatus(200)->assertJson(['message' => 'Gallery updated successfully', 'data' => ['title' => 'G', 'subTitle' => 'New']]);
         $this->assertCount(1, $response->json('data.photos'));
-        $this->assertRegExp('#^/uploads/galleries/'.$id.'/\d{13}-c\.png$#', $response->json('data.photos.0.src'));
+        $this->assertMatchesRegularExpression('#^/uploads/galleries/'.$id.'/\d{13}-c\.png$#', $response->json('data.photos.0.src'));
 
         $this->putJson('/api/gallery/0123456789abcdef01234567', ['title' => 'x'])
             ->assertStatus(404)
