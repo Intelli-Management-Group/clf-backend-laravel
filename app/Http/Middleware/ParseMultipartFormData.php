@@ -18,6 +18,12 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 class ParseMultipartFormData
 {
     /**
+     * Request attribute holding the body's parts as [field name, is a file]
+     * in the order sent; absent when PHP parsed the body itself.
+     */
+    const PARTS = 'clf.multipart.parts';
+
+    /**
      * Handle an incoming request.
      *
      * @param  \Illuminate\Http\Request  $request
@@ -49,6 +55,7 @@ class ParseMultipartFormData
         } else {
             $parser = new MultipartParser(config('clf.multipart.field_size_limit'));
             list($fields, $files) = $parser->parse($stream, $boundary, $first);
+            $request->attributes->set(self::PARTS, $parser->parts());
         }
 
         $request->request->replace($fields);

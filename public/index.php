@@ -51,8 +51,9 @@ $app = require_once __DIR__.'/../bootstrap/app.php';
 
 $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
 
+// Not Request::capture(): see App\Http\RequestFactory (multipart PUT bodies on PHP >= 8.4).
 $response = $kernel->handle(
-    $request = Illuminate\Http\Request::capture()
+    $request = App\Http\RequestFactory::capture()
 );
 
 $response->send();

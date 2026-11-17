@@ -49,6 +49,23 @@ class MultipartParserTest extends TestCase
         $this->assertSame('café.png', $files['photos'][2]->getClientOriginalName());
     }
 
+    public function test_parts_keep_the_order_fields_and_files_were_sent()
+    {
+        $parser = new MultipartParser;
+        $stream = fopen('php://temp', 'r+');
+        fwrite($stream, $this->part('name="photoUrls"', '/a.jpg')
+            .$this->part('name="photos"; filename="b.png"', 'b')
+            .$this->part('name="photoUrls"', '/c.jpg')
+            .$this->part('disposition-without-name', 'skipped')
+            .$this->part('name="photos"; filename="d.png"', 'd')
+            .'--'.self::BOUNDARY."--\r\n");
+        rewind($stream);
+
+        $parser->parse($stream, self::BOUNDARY);
+
+        $this->assertSame([['photoUrls', false], ['photos', true], ['photoUrls', false], ['photos', true]], $parser->parts());
+    }
+
     public function test_truncated_body()
     {
         $this->expectException(RequestBodyException::class);
