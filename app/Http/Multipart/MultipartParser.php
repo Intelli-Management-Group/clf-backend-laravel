@@ -44,6 +44,13 @@ final class MultipartParser
     private $fieldSizeLimit;
 
     /**
+     * Every parsed part as [field name, is a file], in the order received.
+     *
+     * @var array
+     */
+    private $parts = [];
+
+    /**
      * Temporary files created while parsing (removed at shutdown if unused).
      *
      * @var array
@@ -73,6 +80,7 @@ final class MultipartParser
         // A leading CRLF lets the first boundary match the same delimiter as the others.
         $this->buffer = "\r\n".$initial;
         $this->eof = false;
+        $this->parts = [];
 
         $delimiter = "\r\n--".$boundary;
         $fields = [];
@@ -127,6 +135,7 @@ final class MultipartParser
                     throw new RequestBodyException('Unexpected end of form');
                 }
                 $this->appendField($fields, $name, $value);
+                $this->parts[] = [$name, false];
                 continue;
             }
 
@@ -141,9 +150,19 @@ final class MultipartParser
 
             $mimeType = isset($headers['content-type']) ? $headers['content-type'] : 'application/octet-stream';
             $files[$name][] = new UploadedFile($path, $filename, $mimeType, UPLOAD_ERR_OK, true);
+            $this->parts[] = [$name, true];
         }
 
         return [$fields, $files];
+    }
+
+    /**
+     * The parts of the last parsed body as [field name, is a file], in the
+     * order they were sent (fields and files are grouped separately by parse()).
+     */
+    public function parts(): array
+    {
+        return $this->parts;
     }
 
     /**

@@ -21,6 +21,8 @@ return [
         'compress' => (bool) env('UPLOADS_COMPRESS', true),
         'max_dimension' => (int) env('UPLOADS_MAX_DIMENSION', 2000),
         'jpeg_quality' => (int) env('UPLOADS_JPEG_QUALITY', 80),
+        // Seconds a gallery create/update may run (compressing many photos is slow); 0 keeps PHP's limit.
+        'time_limit' => (int) env('UPLOADS_TIME_LIMIT', 300),
     ],
 
     /*

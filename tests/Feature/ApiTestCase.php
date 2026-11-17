@@ -64,6 +64,37 @@ abstract class ApiTestCase extends TestCase
     }
 
     /**
+     * Send a raw multipart/form-data request whose parts keep the given order
+     * (as a browser FormData does): [name, value] for a text field,
+     * [name, file name, contents] for a file.
+     *
+     * @return \Illuminate\Foundation\Testing\TestResponse
+     */
+    protected function multipartParts(string $method, string $uri, array $parts)
+    {
+        $boundary = '----clf'.bin2hex(random_bytes(8));
+        $body = '';
+
+        foreach ($parts as $part) {
+            if (count($part) === 3) {
+                list($name, $filename, $contents) = $part;
+                $body .= "--{$boundary}\r\nContent-Disposition: form-data; name=\"{$name}\"; filename=\"{$filename}\"\r\n"
+                    ."Content-Type: application/octet-stream\r\n\r\n{$contents}\r\n";
+            } else {
+                list($name, $value) = $part;
+                $body .= "--{$boundary}\r\nContent-Disposition: form-data; name=\"{$name}\"\r\n\r\n{$value}\r\n";
+            }
+        }
+
+        $body .= "--{$boundary}--\r\n";
+
+        return $this->call($method, $uri, [], [], [], [
+            'CONTENT_TYPE' => "multipart/form-data; boundary={$boundary}",
+            'CONTENT_LENGTH' => strlen($body),
+        ], $body);
+    }
+
+    /**
      * Send a request without any body.
      *
      * @return \Illuminate\Foundation\Testing\TestResponse

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\ParseMultipartFormData;
 use App\Http\Resources\GalleryResource;
 use App\Http\Resources\GallerySummaryResource;
 use App\Models\Gallery;
@@ -87,22 +88,29 @@ class GalleryController extends Controller
     }
 
     /**
-     * POST /api/gallery (multipart)
+     * POST /api/gallery (multipart). Photos are the uploaded `photos` files
+     * and `photoUrls` strings, in the order sent; `catalogThumbnail` may be
+     * a file or a URL string.
      */
     public function store(Request $request)
     {
         try {
+            $this->allowLongUploads();
             $body = $this->body($request, 'title');
             list($thumbnail, $photos) = $this->uploadedImages($request);
 
+            $fields = $this->present($body, ['title', 'year', 'subTitle']);
+            $photoUrls = $this->photoUrls($body);
+
+            // Validate before writing any file, so a rejected request leaves nothing on disk.
+            Gallery::schema()->forCreate($fields);
+
             // The id is chosen up front so the images go straight into the gallery's folder.
             $id = ObjectId::generate();
-            $catalogThumbnail = $thumbnail ? $this->storeThumbnail($thumbnail, $id) : '';
-            $sources = $this->storePhotos($photos, $id);
+            $catalogThumbnail = $thumbnail ? $this->storeThumbnail($thumbnail, $id) : $this->thumbnailUrl($body);
+            $sources = $this->inPartOrder($request, $photoUrls ?: [], $this->storePhotos($photos, $id));
 
-            $attributes = Gallery::schema()->forCreate(
-                $this->present($body, ['title', 'year', 'subTitle']) + ['catalogThumbnail' => $catalogThumbnail]
-            );
+            $attributes = Gallery::schema()->forCreate($fields + ['catalogThumbnail' => $catalogThumbnail]);
 
             $gallery = DB::transaction(function () use ($id, $attributes, $sources) {
                 $gallery = (new Gallery)->fillFromApi($attributes);
@@ -129,19 +137,27 @@ class GalleryController extends Controller
     }
 
     /**
-     * PUT /api/gallery/{id} (multipart). Uploaded photos replace existing
-     * ones; otherwise submitted photoUrls keep only those existing images.
+     * PUT /api/gallery/{id} (multipart). When `photoUrls` is sent it lists
+     * the existing photos to keep, and uploaded `photos` are added in the
+     * order sent (this is what the admin panel does when photos are added to
+     * a gallery). Without `photoUrls`, uploaded photos replace all existing ones.
      */
     public function update(Request $request, string $id)
     {
         try {
+            $this->allowLongUploads();
             $body = $this->body($request, 'title');
             list($thumbnail, $photos) = $this->uploadedImages($request);
 
             $updates = $this->present($body, ['title', 'year', 'subTitle']);
+            if (! $thumbnail && $this->thumbnailUrl($body) !== '') {
+                $updates['catalogThumbnail'] = $this->thumbnailUrl($body);
+            }
 
             $key = Gallery::castId($id);
             $changes = Gallery::schema()->forUpdate($updates, false);
+            // Checked before any file is written.
+            $photoUrls = $this->photoUrls($body);
             $gallery = Gallery::query()->find($key);
 
             if (! $gallery) {
@@ -151,33 +167,27 @@ class GalleryController extends Controller
             if ($thumbnail) {
                 $changes += Gallery::schema()->forUpdate(['catalogThumbnail' => $this->storeThumbnail($thumbnail, $key)], false);
             }
-            $sources = $this->storePhotos($photos, $key);
-            $photoUrls = null;
+            $uploaded = $this->storePhotos($photos, $key);
 
-            if (! $sources && array_key_exists('photoUrls', $body)) {
-                $photoUrls = $body['photoUrls'];
-                if (is_string($photoUrls)) {
-                    $photoUrls = [$photoUrls];
-                }
-                if (! is_array($photoUrls)) {
-                    throw new \InvalidArgumentException('photoUrls must be a string or an array of strings');
-                }
-                foreach ($photoUrls as $photoUrl) {
-                    if (! is_string($photoUrl)) {
-                        throw new \InvalidArgumentException('photoUrls must contain only strings');
-                    }
-                }
-                $photoUrls = array_values(array_filter(array_map('trim', $photoUrls), function ($photoUrl) {
-                    return $photoUrl !== '';
-                }));
+            $sources = null;
+            $replace = false;
+            if ($photoUrls !== null) {
+                $sources = $this->inPartOrder($request, $photoUrls, $uploaded);
+            } elseif ($uploaded) {
+                $sources = $uploaded;
+                $replace = true;
             }
 
-            DB::transaction(function () use ($gallery, $changes, $sources, $photoUrls) {
+            DB::transaction(function () use ($gallery, $changes, $sources, $replace) {
                 $gallery->fillFromApi($changes)->touch();
-                if ($sources) {
+                if ($sources === null) {
+                    return;
+                }
+                if ($replace) {
                     $gallery->replacePhotos($sources);
-                } elseif ($photoUrls !== null) {
-                    $gallery->syncPhotoUrls($photoUrls);
+                } else {
+                    // Keeps the ids of photos that stay, adds the new ones.
+                    $gallery->syncPhotoUrls($sources);
                 }
             });
 
@@ -255,6 +265,87 @@ class GalleryController extends Controller
         $photos = (array) $request->files->get('photos', []);
 
         return [$thumbnails ? end($thumbnails) : null, array_values($photos)];
+    }
+
+    /**
+     * The submitted `photoUrls`, trimmed (null when the field is absent).
+     *
+     * @throws \InvalidArgumentException when it is not a string or a list of strings
+     */
+    private function photoUrls(array $body)
+    {
+        if (! array_key_exists('photoUrls', $body)) {
+            return null;
+        }
+
+        $photoUrls = $body['photoUrls'];
+        if (is_string($photoUrls)) {
+            $photoUrls = [$photoUrls];
+        }
+        if (! is_array($photoUrls)) {
+            throw new \InvalidArgumentException('photoUrls must be a string or an array of strings');
+        }
+        foreach ($photoUrls as $photoUrl) {
+            if (! is_string($photoUrl)) {
+                throw new \InvalidArgumentException('photoUrls must contain only strings');
+            }
+        }
+
+        return array_values(array_map('trim', $photoUrls));
+    }
+
+    /**
+     * A `catalogThumbnail` sent as text (an image URL or an existing
+     * "/uploads/..." path) rather than as a file; '' when there is none.
+     */
+    private function thumbnailUrl(array $body): string
+    {
+        $value = $body['catalogThumbnail'] ?? null;
+        if (is_array($value)) {
+            // Repeated field: the last one wins, as for the file.
+            $value = end($value);
+        }
+
+        return is_string($value) ? trim($value) : '';
+    }
+
+    /**
+     * Merge photo URLs and uploaded photo paths back into the order their
+     * parts were sent (the admin panel interleaves them). When that order is
+     * unknown (JSON body, or a body PHP parsed itself) URLs come first.
+     * Empty URLs are dropped.
+     */
+    private function inPartOrder(Request $request, array $urls, array $uploads): array
+    {
+        $ordered = [];
+        $parts = $request->attributes->get(ParseMultipartFormData::PARTS);
+
+        if (is_array($parts)) {
+            foreach ($parts as list($name, $isFile)) {
+                if ($isFile && $name === 'photos' && $uploads) {
+                    $ordered[] = array_shift($uploads);
+                } elseif (! $isFile && $name === 'photoUrls' && $urls) {
+                    $ordered[] = array_shift($urls);
+                }
+            }
+        }
+
+        return array_values(array_filter(array_merge($ordered, $urls, $uploads), function ($source) {
+            return $source !== '';
+        }));
+    }
+
+    /**
+     * Compressing dozens of phone photos in one request can outlast PHP's
+     * usual 30 second max_execution_time, which would end in a fatal 500.
+     */
+    private function allowLongUploads()
+    {
+        $seconds = (int) config('clf.uploads.time_limit', 300);
+
+        if ($seconds > 0 && function_exists('set_time_limit')) {
+            @set_time_limit($seconds);
+        }
     }
 
     /**

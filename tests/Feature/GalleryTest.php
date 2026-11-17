@@ -128,6 +128,74 @@ class GalleryTest extends ApiTestCase
         ])->assertStatus(200)->assertJsonCount(1, 'data.photos');
     }
 
+    public function test_admin_edit_keeps_existing_photos_and_adds_uploads_in_order()
+    {
+        $created = $this->multipart('POST', '/api/gallery', [['title', 'G']], [
+            ['photos', 'a.png', 'a'],
+            ['photos', 'b.png', 'b'],
+        ])->assertStatus(201)->json('data');
+        $id = $created['_id'];
+        list($a, $b) = $created['photos'];
+
+        // What the admin panel's EditGallery form sends after photos were added.
+        $photos = $this->multipartParts('PUT', "/api/gallery/{$id}", [
+            ['id', $id], ['title', 'G'], ['year', '2026'], ['subTitle', 'Richmond'],
+            ['catalogThumbnail', ''],
+            ['photoUrls', $a['src']],
+            ['photos', 'c.png', 'c'],
+            ['photoUrls', $b['src']],
+            ['photoUrls', 'https://example.com/d.jpg'],
+            ['photos', 'e.png', 'e'],
+        ])->assertStatus(200)->json('data.photos');
+
+        $this->assertCount(5, $photos);
+        $this->assertSame([$a['_id'], $b['_id']], [$photos[0]['_id'], $photos[2]['_id']]);
+        $this->assertSame([$a['src'], $b['src'], 'https://example.com/d.jpg'], [$photos[0]['src'], $photos[2]['src'], $photos[3]['src']]);
+        $this->assertMatchesRegularExpression('#^/uploads/galleries/'.$id.'/\d{13}-c\.png$#', $photos[1]['src']);
+        $this->assertMatchesRegularExpression('#^/uploads/galleries/'.$id.'/\d{13}-e\.png$#', $photos[4]['src']);
+
+        $this->assertSame(array_column($photos, 'src'), array_column($this->getJson("/api/gallery/{$id}")->json('data.photos'), 'src'));
+    }
+
+    public function test_create_accepts_thumbnail_and_photo_urls_alongside_uploads()
+    {
+        $data = $this->multipartParts('POST', '/api/gallery', [
+            ['id', ''], ['title', 'New'], ['year', '2026'], ['subTitle', 'Richmond'],
+            ['catalogThumbnail', ' https://example.com/thumb.jpg '],
+            ['photos', 'p1.png', 'one'],
+            ['photoUrls', 'https://example.com/p2.jpg'],
+            ['photos', 'p3.png', 'three'],
+        ])->assertStatus(201)->json('data');
+
+        $this->assertSame('https://example.com/thumb.jpg', $data['catalogThumbnail']);
+        $this->assertCount(3, $data['photos']);
+        $this->assertMatchesRegularExpression('#/\d{13}-p1\.png$#', $data['photos'][0]['src']);
+        $this->assertSame('https://example.com/p2.jpg', $data['photos'][1]['src']);
+        $this->assertMatchesRegularExpression('#/\d{13}-p3\.png$#', $data['photos'][2]['src']);
+    }
+
+    public function test_update_sets_a_thumbnail_url_and_keeps_it_when_sent_back()
+    {
+        $id = $this->multipart('POST', '/api/gallery', [['title', 'G']], [['catalogThumbnail', 't.png', 't']])->json('data._id');
+        $current = $this->getJson("/api/gallery/{$id}")->json('data.catalogThumbnail');
+
+        // The admin panel sends the current thumbnail path back on every save.
+        $this->multipartParts('PUT', "/api/gallery/{$id}", [['title', 'G'], ['catalogThumbnail', $current]])
+            ->assertStatus(200)->assertJson(['data' => ['catalogThumbnail' => $current]]);
+
+        $this->multipartParts('PUT', "/api/gallery/{$id}", [['title', 'G'], ['catalogThumbnail', 'https://example.com/new.jpg']])
+            ->assertStatus(200)->assertJson(['data' => ['catalogThumbnail' => 'https://example.com/new.jpg']]);
+    }
+
+    public function test_a_rejected_create_stores_no_files()
+    {
+        $this->multipart('POST', '/api/gallery', [['year', '2024']], [['catalogThumbnail', 't.png', 't'], ['photos', 'p.png', 'p']])
+            ->assertStatus(500)
+            ->assertJson(['error' => 'Gallery validation failed: title: Path `title` is required.']);
+
+        $this->assertDirectoryDoesNotExist($this->uploads.'/galleries');
+    }
+
     public function test_list_by_year_orders_groups_like_a_javascript_object()
     {
         foreach (['abc', '2025', '', '0', '2023'] as $year) {
@@ -137,7 +205,8 @@ class GalleryTest extends ApiTestCase
         $response = $this->getJson('/api/gallery/list-by-year')->assertStatus(200);
         $data = json_decode($response->getContent(), false)->data;
 
-        $this->assertSame(['0', '2023', '2025', 'abc', 'unknown'], array_keys((array) $data));
+        // (array) turns numeric keys into ints, so compare them as the strings JSON sent.
+        $this->assertSame(['0', '2023', '2025', 'abc', 'unknown'], array_map('strval', array_keys((array) $data)));
         $this->assertSame(['_id', 'title', 'year', 'catalogThumbnail', 'photos'], array_keys((array) $data->{'2025'}[0]));
     }
 
