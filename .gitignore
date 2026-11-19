@@ -72,3 +72,8 @@ desktop.ini
 *.swp
 *.swo
 config.bat
+
+# Environment files (re-added: removed in 6d00921)
+.env
+.env.backup
+.env.production
